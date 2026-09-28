@@ -1,0 +1,4 @@
+node_modules/
+.DS_Store
+*.log
+/challenge-1-url-shortener/server

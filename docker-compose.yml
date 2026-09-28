@@ -1,0 +1,85 @@
+# Everything a reviewer needs, driven by ./review.sh. Only Docker is required.
+name: youpass-review
+
+x-db-env: &db-env
+  PGHOST: postgres
+  PGUSER: youpass
+  PGPASSWORD: youpass
+  PGDATABASE: youpass
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: youpass
+      POSTGRES_PASSWORD: youpass
+      POSTGRES_DB: youpass
+    volumes:
+      - ./challenge-1-url-shortener/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Healthy only once the init scripts have created the tables.
+      test: ["CMD-SHELL", "psql -U youpass -d youpass -h 127.0.0.1 -c 'SELECT 1 FROM share_links LIMIT 1'"]
+      interval: 1s
+      retries: 60
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      retries: 30
+
+  # Challenge 1: unit tests (race detector) + integration test on real Postgres.
+  backend-test:
+    image: golang:1.26
+    profiles: [test]
+    working_dir: /src
+    volumes:
+      - ./challenge-1-url-shortener:/src
+      - go-mod:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+    environment:
+      TEST_DATABASE_URL: postgres://youpass:youpass@postgres:5432/youpass
+    command: ["go", "test", "-race", "-count=1", "-v", "./..."]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Challenge 2: typecheck + Vitest. node_modules stays inside the container
+  # so native binaries match Linux, not the reviewer's OS.
+  frontend-test:
+    image: node:22-alpine
+    profiles: [test]
+    working_dir: /app
+    volumes:
+      - ./challenge-2-seamless-auth:/app
+      - /app/node_modules
+    command: ["sh", "-c", "npm ci --no-audit --no-fund --loglevel=error && npm run typecheck && npx vitest run --reporter=verbose"]
+
+  api:
+    build: ./challenge-1-url-shortener
+    environment:
+      DATABASE_URL: postgres://youpass:youpass@postgres:5432/youpass
+      REDIS_URL: redis://redis:6379/0
+      PUBLIC_BASE_URL: http://localhost:${API_PORT:-8080}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  # End-to-end smoke test against the running API (real Postgres + Redis).
+  smoke:
+    image: postgres:16-alpine
+    profiles: [test]
+    environment:
+      <<: *db-env
+      API: http://api:8080
+    volumes:
+      - ./challenge-1-url-shortener/scripts/smoke.sh:/smoke.sh:ro
+    entrypoint: ["sh", "-c", "apk add --no-cache -q curl jq >/dev/null && sh /smoke.sh"]
+    depends_on:
+      api: { condition: service_started }
+
+volumes:
+  go-mod:
+  go-build:
