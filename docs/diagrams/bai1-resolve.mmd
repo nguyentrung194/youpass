@@ -1,0 +1,22 @@
+flowchart TD
+  req(["GET /api/v1/s/{code}"]) --> valid{{"Code đúng định dạng?<br/>8 ký tự base62"}}
+  valid -- "Không" --> bad["404<br/><i>0 I/O</i>"]
+  valid -- "Có" --> l1["<b>L1 · Cache trong process</b><br/>TTL 5s · ~ micro giây"]
+  l1 -- "miss" --> l2["<b>L2 · Redis</b><br/>TTL 10 phút ± jitter · negative cache 30s<br/>~ 1 ms"]
+  l2 -- "miss" --> sf["<b>singleflight(code)</b><br/>N request đồng thời → đúng 1 query Postgres<br/>ghi lại L2 (CAS theo version) + L1 · ~ 2–5 ms"]
+  l1 -- "hit" --> check
+  l2 -- "hit" --> check
+  sf --> check{{"<b>Kiểm tra quyền trên MỌI request</b><br/>status = active và chưa hết hạn?"}}
+  check -- "Có" --> ok["<b>200</b> · bài làm bản công khai<br/>Cache-Control: no-store · X-Robots-Tag: noindex"]
+  check -- "Không" --> nf["<b>404</b><br/>không tồn tại / đã tắt / đã xoá / hết hạn"]
+
+  classDef cache fill:#E8F1FB,stroke:#3B78C2,color:#10233F
+  classDef db fill:#EAF6EC,stroke:#3E8E4F,color:#123318
+  classDef good fill:#E6F4EA,stroke:#2E7D32,color:#0B3D12
+  classDef bad fill:#FDECEA,stroke:#C62828,color:#4A0B0B
+  classDef gate fill:#FFF6E0,stroke:#C98A00,color:#3D2A00
+  class l1,l2 cache
+  class sf db
+  class ok good
+  class bad,nf bad
+  class valid,check gate

@@ -2,6 +2,16 @@
 
 Module xác thực phía FE: access token hết hạn giữa chừng thì tự refresh và chạy tiếp request, người dùng không bị đá về trang login. Thiết kế chi tiết nằm trong tài liệu trả lời (Bài toán 2).
 
+## Sơ đồ luồng
+
+**(A) Refresh chủ động · (B) Trước khi gửi request**
+
+![Refresh chủ động](../docs/diagrams/bai2-chu-dong.png)
+
+**(C) Khi vẫn nhận 401**
+
+![Khi nhận 401](../docs/diagrams/bai2-khi-401.png)
+
 ## Chạy test
 
 ```bash

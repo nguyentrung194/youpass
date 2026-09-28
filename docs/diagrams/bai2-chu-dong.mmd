@@ -1,0 +1,22 @@
+flowchart TB
+  subgraph A["(A) Chủ động: refresh trước khi token hết hạn"]
+    direction LR
+    login(["Đăng nhập /<br/>refresh OK"]) --> timer["Hẹn giờ refresh<br/>exp − 60s − jitter"]
+    timer --> bg["<b>Refresh ngầm</b><br/>người dùng không thấy gì"]
+    wake(["Tab thức dậy<br/>visibilitychange · online · focus"]) --> near{{"Token còn &lt; 60s?"}}
+    near -- "Có" --> bg
+  end
+  subgraph B["(B) Trước khi gửi request"]
+    direction LR
+    af(["authFetch(req)"]) --> gat["getAccessToken(minValidity)"] --> enough{{"Token còn đủ hạn?"}}
+    enough -- "Có" --> send["Gắn Bearer → gửi"]
+    enough -- "Không, hoặc sắp<br/>upload file lớn" --> rf["refresh() → gửi"]
+  end
+  A ~~~ B
+
+  classDef good fill:#E6F4EA,stroke:#2E7D32,color:#0B3D12
+  classDef gate fill:#FFF6E0,stroke:#C98A00,color:#3D2A00
+  classDef step fill:#E8F1FB,stroke:#3B78C2,color:#10233F
+  class bg,send good
+  class near,enough gate
+  class timer,gat,rf step

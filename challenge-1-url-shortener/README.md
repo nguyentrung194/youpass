@@ -2,6 +2,10 @@
 
 Go service chia sẻ bài làm qua link rút gọn. Thiết kế chi tiết nằm trong tài liệu trả lời (Bài toán 1); README này mô tả cách chạy và cấu trúc code.
 
+## Luồng resolve `GET /api/v1/s/{code}`
+
+![Luồng resolve](../docs/diagrams/bai1-resolve.png)
+
 ## Chạy
 
 ```bash

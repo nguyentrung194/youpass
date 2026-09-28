@@ -1,0 +1,25 @@
+flowchart TD
+  r(["req1, req2, req3 … cùng nhận 401"]) --> rf["refresh(token bị từ chối)"]
+  rf --> newer{{"Đã có token mới hơn?"}}
+  newer -- "Có" --> replay
+  newer -- "Không" --> sf["<b>Single-flight trong tab</b><br/>inflight ??= refreshAcrossTabs()<br/>mọi request dùng chung 1 promise"]
+  sf --> lock["<b>Web Lock</b> 'youpass-auth-refresh'<br/>chỉ 1 tab refresh tại 1 thời điểm"]
+  lock --> peer{{"Tab khác vừa refresh?"}}
+  peer -- "Có" --> wait["Chờ BroadcastChannel<br/>→ dùng token của tab đó"]
+  peer -- "Không" --> api["<b>POST /auth/refresh</b><br/>retry backoff khi lỗi mạng / 5xx"]
+  wait --> replay
+  api -- "200" --> save["Lưu token trong memory<br/>broadcast cho các tab · hẹn giờ"]
+  save --> replay(["<b>Replay request với token mới</b><br/>đúng 1 lần · người dùng không thấy gián đoạn"])
+  api -- "Lỗi mạng / 5xx" --> net["Trả lỗi cho caller<br/><b>GIỮ phiên</b>, không logout"]
+  api -- "401: refresh token<br/>hết hạn / bị thu hồi" --> exp["<b>Session expired</b><br/>request được giữ lại chờ, không reject<br/>modal đăng nhập hiện ĐÈ lên trang<br/>bài đang viết còn nguyên"]
+  exp --> relog["Đăng nhập OK → setSession → broadcast"]
+  relog --> replay
+
+  classDef good fill:#E6F4EA,stroke:#2E7D32,color:#0B3D12
+  classDef warn fill:#FDECEA,stroke:#C62828,color:#4A0B0B
+  classDef gate fill:#FFF6E0,stroke:#C98A00,color:#3D2A00
+  classDef step fill:#E8F1FB,stroke:#3B78C2,color:#10233F
+  class replay,save good
+  class exp,net warn
+  class newer,peer gate
+  class sf,lock,api,wait,relog,rf step
